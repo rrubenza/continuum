@@ -2,8 +2,6 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-import smolgp
-
 @partial(jax.jit, static_argnames=('window', 'n_reject'))
 def rolling_maximum(
     flux:     jnp.ndarray,
@@ -69,7 +67,8 @@ def logistic_weights(p, p0=0.9, softness=0.03):
                                    'edge_boost', 'edge_pixels',
                                     'line_suppress_factor',
                                     'p0_deriv', 'softness_deriv',
-                                    'p0_edge', 'softness_edge', 'fit_target'))
+                                    'p0_edge', 'softness_edge', 
+                                    'fit_target', 'pre_smooth'))
 def fit_continuum(
     wave:             jnp.ndarray,
     flux:             jnp.ndarray,
@@ -86,7 +85,8 @@ def fit_continuum(
     softness_deriv: float = 0.01,
     p0_edge: float = 0.05,
     softness_edge: float = 0.05,
-    fit_target: str = 'narrow' # 'envelope', 'flux', 'wide'
+    fit_target: str = 'narrow', 
+    pre_smooth: bool = False,
 ) -> tuple:
     """
     Estimate the continuum of a single echelle order using
@@ -137,17 +137,21 @@ def fit_continuum(
     n = len(flux)
     x = jnp.linspace(-1.0, 1.0, n)
 
-    # Step 0: Use a GP to fit a smooth flux model
-    # This mitigates the impact of noise on the rolling maximum 
-    # and its derivatives, plus filters over any NaNs in the input flux.
-    missing = ~jnp.isfinite(flux)
-    f_safe = jnp.where(missing, 0.0, flux) # doesn't matter since err=inf
-    e_safe = jnp.where(missing, 1e9, err) # large error -> downweight in GP fit
-    med = jnp.median(f_safe) # scale to ~1 for GP fit
-    kernel = smolgp.kernels.Exp(sigma=0.1, scale=1)
-    gp = smolgp.GaussianProcess(kernel, X=wave, diag=jnp.power(e_safe/med, 2))
-    f_smooth = gp.predict(wave, f_safe/med, return_var=False)
-    flux = f_smooth# * med
+    if pre_smooth:
+        import smolgp
+        # Step 0: Use a GP to fit a smooth flux model
+        # This mitigates the impact of noise on the rolling maximum 
+        # and its derivatives, plus filters over any NaNs in the input flux.
+        missing = ~jnp.isfinite(flux)
+        f_safe = jnp.where(missing, 0.0, flux) # doesn't matter since err=inf
+        e_safe = jnp.where(missing, 1e9, err) # large error -> downweight in GP fit
+        med = jnp.median(f_safe) # scale to ~1 for GP fit
+        kernel = smolgp.kernels.Exp(sigma=0.1, scale=1)
+        gp = smolgp.GaussianProcess(kernel, X=wave, diag=jnp.power(e_safe/med, 2))
+        f_smooth = gp.predict(wave, f_safe/med, return_var=False)
+        flux = f_smooth# * med
+    else:
+        med = 1.0
     ######################################################################
 
     # Step 1: Rolling maxima and envelope
