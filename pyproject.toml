@@ -1,0 +1,24 @@
+[project]
+name = "continuum"
+version = "0.1.0"
+description = "Continuum normalization for echelle spectrographs."
+authors = [
+        { name = "Ryan Rubenzahl", email = "rrubenzahl@gmail.com" },
+          ]
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = ['jax',
+                'smolgp>=0.1.4',
+                ]
+
